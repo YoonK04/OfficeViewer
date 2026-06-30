@@ -1,9 +1,22 @@
 // luckyexcel(Luckysheet 포맷) → Univer IWorkbookData 변환기
-// 값 / 수식 / 병합 / 열너비·행높이 / 기본 서식(글꼴, 색, 정렬, 숫자서식)을 보존한다.
+// 값 / 수식 / 병합 / 열너비·행높이 / 서식(글꼴·색·정렬·숫자서식) / 테두리를 보존한다.
 
 // Luckysheet 정렬 enum → Univer enum 매핑
 const H_ALIGN = { 0: 2, 1: 1, 2: 3 } // lucky(0중앙,1좌,2우) → univer(1좌,2중앙,3우)
 const V_ALIGN = { 0: 2, 1: 1, 2: 3 } // lucky(0중간,1상,2하) → univer(1상,2중간,3하)
+
+// Excel 테두리 style 문자열 → Univer BorderStyleTypes
+const BORDER_STYLE = {
+  thin: 1, hair: 2, dotted: 3, dashed: 4, dashDot: 5, dashDotDot: 6,
+  double: 7, medium: 8, mediumDashed: 9, mediumDashDot: 10,
+  mediumDashDotDot: 11, slantDashDot: 12, thick: 13
+}
+
+function borderSide(side) {
+  if (!side || !side.color) return undefined
+  const s = BORDER_STYLE[side.style] || 1
+  return { s, cl: { rgb: side.color } }
+}
 
 function buildStyle(v) {
   const s = {}
@@ -39,8 +52,7 @@ export function luckyToUniver(luckyJson, fallbackName = 'Workbook') {
   let styleSeq = 0
 
   function registerStyle(styleObj) {
-    const keys = Object.keys(styleObj)
-    if (keys.length === 0) return undefined
+    if (Object.keys(styleObj).length === 0) return undefined
     const key = JSON.stringify(styleObj)
     if (styleKeyToId.has(key)) return styleKeyToId.get(key)
     const id = 'st-' + styleSeq++
@@ -51,35 +63,75 @@ export function luckyToUniver(luckyJson, fallbackName = 'Workbook') {
 
   const sheets = {}
   const sheetOrder = []
-
   const luckySheets = (luckyJson.sheets || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))
 
   luckySheets.forEach((ls, idx) => {
     const sheetId = 'sheet-' + idx
     sheetOrder.push(sheetId)
 
-    const cellData = {}
     let maxRow = ls.row || 0
     let maxCol = ls.column || 0
+    const cellMap = new Map() // "r_c" → { r, c, v, t, f, style }
 
+    const ensureCell = (r, c) => {
+      const k = r + '_' + c
+      let cell = cellMap.get(k)
+      if (!cell) {
+        cell = { r, c, style: {} }
+        cellMap.set(k, cell)
+      }
+      if (r + 1 > maxRow) maxRow = r + 1
+      if (c + 1 > maxCol) maxCol = c + 1
+      return cell
+    }
+
+    // 값 + 서식
     for (const cd of ls.celldata || []) {
       const { r, c, v } = cd
       if (v === null || v === undefined) continue
-      if (r + 1 > maxRow) maxRow = r + 1
-      if (c + 1 > maxCol) maxCol = c + 1
-      const cell = {}
+      const cell = ensureCell(r, c)
       const { value, t } = cellValueAndType(v)
       cell.v = value
       cell.t = t
-      if (v.f) cell.f = v.f // 수식
-      const styleObj = buildStyle(v)
-      const sid = registerStyle(styleObj)
-      if (sid) cell.s = sid
-      if (!cellData[r]) cellData[r] = {}
-      cellData[r][c] = cell
+      if (v.f) cell.f = v.f
+      Object.assign(cell.style, buildStyle(v))
     }
 
     const config = ls.config || {}
+
+    // 테두리 (셀 단위)
+    for (const bi of config.borderInfo || []) {
+      if (bi.rangeType === 'cell' && bi.value) {
+        const val = bi.value
+        const cell = ensureCell(val.row_index, val.col_index)
+        const bd = {}
+        const t = borderSide(val.t)
+        const b = borderSide(val.b)
+        const l = borderSide(val.l)
+        const r = borderSide(val.r)
+        if (t) bd.t = t
+        if (b) bd.b = b
+        if (l) bd.l = l
+        if (r) bd.r = r
+        if (Object.keys(bd).length) cell.style.bd = bd
+      } else if (bi.rangeType === 'range' && Array.isArray(bi.range)) {
+        applyRangeBorder(bi, ensureCell)
+      }
+    }
+
+    // cellData 조립
+    const cellData = {}
+    for (const cell of cellMap.values()) {
+      const out = {}
+      if (cell.v !== undefined) out.v = cell.v
+      if (cell.t !== undefined) out.t = cell.t
+      if (cell.f) out.f = cell.f
+      const sid = registerStyle(cell.style)
+      if (sid) out.s = sid
+      if (out.v === undefined && out.f === undefined && out.s === undefined) continue
+      if (!cellData[cell.r]) cellData[cell.r] = {}
+      cellData[cell.r][cell.c] = out
+    }
 
     // 병합
     const mergeData = []
@@ -95,29 +147,26 @@ export function luckyToUniver(luckyJson, fallbackName = 'Workbook') {
       }
     }
 
-    // 열 너비
+    // 열 너비 / 행 높이 (luckyexcel가 픽셀로 제공)
     const columnData = {}
     if (config.columnlen) {
-      for (const k of Object.keys(config.columnlen)) {
-        columnData[k] = { w: config.columnlen[k] }
-      }
+      for (const k of Object.keys(config.columnlen)) columnData[k] = { w: config.columnlen[k] }
     }
-
-    // 행 높이
     const rowData = {}
     if (config.rowlen) {
-      for (const k of Object.keys(config.rowlen)) {
-        rowData[k] = { h: config.rowlen[k] }
-      }
+      for (const k of Object.keys(config.rowlen)) rowData[k] = { h: config.rowlen[k] }
     }
+
+    const defColW = Math.round(ls.defaultColWidth || 72)
+    const defRowH = Math.round(ls.defaultRowHeight || 19)
 
     sheets[sheetId] = {
       id: sheetId,
       name: ls.name || `Sheet${idx + 1}`,
       rowCount: Math.max(maxRow + 50, 100),
       columnCount: Math.max(maxCol + 10, 26),
-      defaultColumnWidth: 88,
-      defaultRowHeight: 24,
+      defaultColumnWidth: defColW,
+      defaultRowHeight: defRowH,
       cellData,
       mergeData,
       columnData,
@@ -127,14 +176,7 @@ export function luckyToUniver(luckyJson, fallbackName = 'Workbook') {
   })
 
   if (sheetOrder.length === 0) {
-    // 빈 워크북 방지
-    sheets['sheet-0'] = {
-      id: 'sheet-0',
-      name: 'Sheet1',
-      rowCount: 100,
-      columnCount: 26,
-      cellData: {}
-    }
+    sheets['sheet-0'] = { id: 'sheet-0', name: 'Sheet1', rowCount: 100, columnCount: 26, cellData: {} }
     sheetOrder.push('sheet-0')
   }
 
@@ -142,10 +184,33 @@ export function luckyToUniver(luckyJson, fallbackName = 'Workbook') {
     id: 'wb-' + Math.abs(hashString(fallbackName)),
     name: (luckyJson.info && luckyJson.info.name) || fallbackName,
     appVersion: '0.1.0',
-    locale: 'enUS',
+    locale: 'koKR',
     sheetOrder,
     styles,
     sheets
+  }
+}
+
+// 범위 테두리(border-all/outside/top/...) → 각 셀 변에 적용
+function applyRangeBorder(bi, ensureCell) {
+  const side = borderSide({ style: bi.style === undefined ? 'thin' : bi.style, color: bi.color || '#000000' })
+  if (!side) return
+  const type = bi.borderType || 'border-all'
+  for (const rng of bi.range) {
+    const [r1, r2] = rng.row
+    const [c1, c2] = rng.column
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        const cell = ensureCell(r, c)
+        const bd = cell.style.bd || (cell.style.bd = {})
+        const all = type === 'border-all'
+        const outside = type === 'border-outside' || type === 'border-none'
+        if (all || type === 'border-top' || (outside && r === r1)) bd.t = side
+        if (all || type === 'border-bottom' || (outside && r === r2)) bd.b = side
+        if (all || type === 'border-left' || (outside && c === c1)) bd.l = side
+        if (all || type === 'border-right' || (outside && c === c2)) bd.r = side
+      }
+    }
   }
 }
 

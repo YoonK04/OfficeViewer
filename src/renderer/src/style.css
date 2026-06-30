@@ -102,6 +102,8 @@ body {
   max-width: 220px;
 }
 .tab:hover { background: var(--bg-3); }
+.tab { cursor: grab; }
+.tab.dragging { opacity: .4; }
 .tab.active { background: var(--bg); color: var(--text); }
 .tab-label { overflow: hidden; text-overflow: ellipsis; }
 .tab-close { width: 16px; height: 16px; border-radius: 3px; text-align: center; line-height: 16px; color: var(--text-dim); }
@@ -170,6 +172,31 @@ body {
 .btn:hover { background: var(--accent-hover); }
 .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
 .btn.ghost:hover { background: var(--bg-3); }
+
+.tab-ghost {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  background: var(--accent);
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+  box-shadow: 0 6px 18px #0009;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.drop-indicator {
+  position: fixed;
+  z-index: 9998;
+  pointer-events: none;
+  background: rgba(14, 99, 156, 0.28);
+  border: 2px solid var(--accent-hover);
+  border-radius: 4px;
+  transition: left .08s, top .08s, width .08s, height .08s;
+}
 
 .toast {
   position: fixed;

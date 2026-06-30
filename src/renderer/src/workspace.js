@@ -19,7 +19,7 @@ export function initWorkspace(el) {
   addPane() // 시작 패널 1개
 }
 
-function addPane() {
+function addPane(afterPane) {
   const pane = {
     id: uid('pane'),
     el: null,
@@ -41,7 +41,6 @@ function addPane() {
 
   paneEl.appendChild(tabbar)
   paneEl.appendChild(body)
-  workspaceEl.appendChild(paneEl)
 
   pane.el = paneEl
   pane.tabbarEl = tabbar
@@ -50,7 +49,16 @@ function addPane() {
   paneEl.addEventListener('mousedown', () => setActivePane(pane.id))
 
   paneEl.style.flex = '1 1 0'
-  panes.push(pane)
+
+  // afterPane이 주어지면 그 패널 바로 오른쪽에 삽입, 아니면 맨 끝에 추가
+  if (afterPane && afterPane.el) {
+    afterPane.el.after(paneEl)
+    const i = panes.indexOf(afterPane)
+    panes.splice(i + 1, 0, pane)
+  } else {
+    workspaceEl.appendChild(paneEl)
+    panes.push(pane)
+  }
   setActivePane(pane.id)
   renderTabbar(pane)
   renderBody(pane)
@@ -115,7 +123,7 @@ function setActivePane(id) {
 }
 
 export function splitActivePane() {
-  const newPane = addPane()
+  const newPane = addPane(getActivePane())
   return newPane
 }
 
@@ -284,6 +292,130 @@ function closeTab(pane, tabId) {
   renderBody(pane)
 }
 
+// ── 탭 드래그 (이동 / 우측 분할) ──────────────
+const DRAG_THRESHOLD = 5
+
+function beginTabDrag(e, fromPane, tab, tabEl) {
+  const startX = e.clientX
+  const startY = e.clientY
+  let started = false
+  let ghost = null
+  let indicator = null
+  let lastTarget = null
+
+  const onMove = (ev) => {
+    if (!started) {
+      if (Math.abs(ev.clientX - startX) < DRAG_THRESHOLD && Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return
+      started = true
+      document.body.style.cursor = 'grabbing'
+      document.body.style.userSelect = 'none'
+      tabEl.classList.add('dragging')
+      ghost = document.createElement('div')
+      ghost.className = 'tab-ghost'
+      ghost.textContent = tab.fileName
+      document.body.appendChild(ghost)
+      indicator = document.createElement('div')
+      indicator.className = 'drop-indicator'
+      document.body.appendChild(indicator)
+    }
+    ghost.style.left = ev.clientX + 12 + 'px'
+    ghost.style.top = ev.clientY + 12 + 'px'
+    lastTarget = resolveDropTarget(ev.clientX, ev.clientY)
+    paintIndicator(indicator, lastTarget)
+  }
+
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    tabEl.classList.remove('dragging')
+    if (ghost) ghost.remove()
+    if (indicator) indicator.remove()
+
+    if (!started) {
+      // 단순 클릭 → 활성화
+      setActivePane(fromPane.id)
+      activateTab(fromPane, tab.id)
+      return
+    }
+    if (!lastTarget) return
+    if (lastTarget.mode === 'split-right') {
+      const np = addPane(lastTarget.pane)
+      moveTab(tab, fromPane, np)
+    } else if (lastTarget.pane !== fromPane) {
+      moveTab(tab, fromPane, lastTarget.pane)
+    } else {
+      setActivePane(fromPane.id)
+      activateTab(fromPane, tab.id)
+    }
+  }
+
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+// 커서 위치 → 어느 패널의 어떤 동작인지 판정
+function resolveDropTarget(x, y) {
+  const el = document.elementFromPoint(x, y)
+  if (!el) return null
+  const paneEl = el.closest('.pane')
+  if (!paneEl) return null
+  const pane = panes.find((p) => p.id === paneEl.dataset.paneId)
+  if (!pane) return null
+  const paneRect = paneEl.getBoundingClientRect()
+  const tabbarRect = pane.tabbarEl.getBoundingClientRect()
+  if (y <= tabbarRect.bottom) return { pane, mode: 'merge', rect: paneRect, tabbarRect }
+  if (x >= paneRect.right - paneRect.width * 0.35) return { pane, mode: 'split-right', rect: paneRect }
+  return { pane, mode: 'merge', rect: paneRect, tabbarRect }
+}
+
+function paintIndicator(indicator, target) {
+  if (!target) {
+    indicator.style.display = 'none'
+    return
+  }
+  indicator.style.display = 'block'
+  const r = target.rect
+  if (target.mode === 'split-right') {
+    indicator.style.left = r.left + r.width / 2 + 'px'
+    indicator.style.top = r.top + 'px'
+    indicator.style.width = r.width / 2 + 'px'
+    indicator.style.height = r.height + 'px'
+  } else {
+    indicator.style.left = r.left + 'px'
+    indicator.style.top = r.top + 'px'
+    indicator.style.width = r.width + 'px'
+    indicator.style.height = r.height + 'px'
+  }
+}
+
+// 탭을 from 패널에서 to 패널로 이동 (뷰어 DOM 보존)
+function moveTab(tab, from, to) {
+  if (from === to) return
+  const idx = from.tabs.indexOf(tab)
+  if (idx === -1) return
+  from.tabs.splice(idx, 1)
+  if (tab.contentEl) to.bodyEl.appendChild(tab.contentEl)
+  to.tabs.push(tab)
+
+  // 원래 패널의 활성 탭 정리
+  if (from.activeTabId === tab.id) {
+    const n = from.tabs[idx] || from.tabs[idx - 1]
+    from.activeTabId = n ? n.id : null
+  }
+  from.tabs.forEach((t) => {
+    if (t.contentEl) t.contentEl.classList.toggle('hidden', t.id !== from.activeTabId)
+  })
+  renderTabbar(from)
+  renderBody(from)
+
+  setActivePane(to.id)
+  activateTab(to, tab.id) // 대상 패널에서 표시(+ 미로딩 시 로드)
+
+  if (from.tabs.length === 0 && panes.length > 1) closePane(from)
+}
+
 function renderTabbar(pane) {
   const bar = pane.tabbarEl
   bar.innerHTML = ''
@@ -307,9 +439,11 @@ function renderTabbar(pane) {
 
     tabEl.appendChild(label)
     tabEl.appendChild(close)
-    tabEl.addEventListener('click', () => {
-      setActivePane(pane.id)
-      activateTab(pane, tab.id)
+    // 마우스다운 → (이동 적으면)탭 활성화 / (드래그)탭 이동·분할
+    tabEl.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return
+      if (e.target.classList.contains('tab-close')) return
+      beginTabDrag(e, pane, tab, tabEl)
     })
     bar.appendChild(tabEl)
   })

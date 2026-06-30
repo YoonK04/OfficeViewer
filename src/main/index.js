@@ -53,6 +53,12 @@ async function runSmoke(win) {
   try {
     await wait(1500)
     await run(`window.__ov.setRoot(${JSON.stringify(sampleDir)})`)
+    await win.webContents.capturePage() // 워밍업(첫 캡처 빈이미지 방지)
+
+    // 0) 공정도(테두리/병합/열너비 충실도 확인)
+    await run(`window.__ov.openFile(${JSON.stringify(F('공정도.xlsx', '.xlsx'))})`)
+    await wait(3500)
+    await cap('flowchart')
 
     // 1) 엑셀
     await run(`window.__ov.openFile(${JSON.stringify(F('매출요약.xlsx', '.xlsx'))})`)
@@ -105,6 +111,47 @@ async function runSmoke(win) {
       await cap('split')
     } catch (e) {
       console.log('SMOKE_SPLIT_ERROR ' + e)
+    }
+
+    // 6) 탭 드래그 → 우측 분할 (다중 탭이 있는 첫 패널의 탭을 빼내 분할)
+    try {
+      await run(`(() => {
+        const pane = document.querySelectorAll('.pane')[0];
+        pane.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+        const tab = pane.querySelector('.tab.active') || pane.querySelector('.tab');
+        const tr = tab.getBoundingClientRect(), pr = pane.getBoundingClientRect();
+        const sx = tr.left + tr.width/2, sy = tr.top + tr.height/2;
+        const tx = pr.right - 20, ty = pr.top + pr.height/2;
+        const fire = (t,x,y,el) => (el||window).dispatchEvent(new MouseEvent(t,{bubbles:true,clientX:x,clientY:y,button:0}));
+        fire('mousedown',sx,sy,tab); fire('mousemove',sx+10,sy);
+        fire('mousemove',(sx+tx)/2,(sy+ty)/2); fire('mousemove',tx,ty); fire('mouseup',tx,ty);
+        return [...document.querySelectorAll('.pane')].map(p => p.querySelectorAll('.tab').length).join(',');
+      })()`).then((n) => console.log('SMOKE_PANES_AFTER_SPLIT tabs=[' + n + ']'))
+      await wait(2500)
+      await cap('drag-split')
+    } catch (e) {
+      console.log('SMOKE_DRAGSPLIT_ERROR ' + e)
+    }
+
+    // 7) 탭 드래그 → 첫 패널 탭바에 합치기(merge)
+    try {
+      await run(`(() => {
+        const src = document.querySelector('.pane.active') || document.querySelector('.pane');
+        const tab = src.querySelector('.tab.active') || src.querySelector('.tab');
+        const first = document.querySelectorAll('.pane')[0];
+        const tb = first.querySelector('.tabbar').getBoundingClientRect();
+        const tr = tab.getBoundingClientRect();
+        const sx = tr.left + tr.width/2, sy = tr.top + tr.height/2;
+        const tx = tb.left + tb.width/2, ty = tb.top + tb.height/2;
+        const fire = (t,x,y,el) => (el||window).dispatchEvent(new MouseEvent(t,{bubbles:true,clientX:x,clientY:y,button:0}));
+        fire('mousedown',sx,sy,tab); fire('mousemove',sx+10,sy);
+        fire('mousemove',(sx+tx)/2,(sy+ty)/2); fire('mousemove',tx,ty); fire('mouseup',tx,ty);
+        return document.querySelectorAll('.pane').length;
+      })()`).then((n) => console.log('SMOKE_PANES_AFTER_MERGE ' + n))
+      await wait(2500)
+      await cap('drag-merge')
+    } catch (e) {
+      console.log('SMOKE_DRAGMERGE_ERROR ' + e)
     }
 
     console.log('SMOKE_DONE')

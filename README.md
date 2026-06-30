@@ -6,6 +6,8 @@
 
 > 모든 처리는 **로컬에서 오프라인**으로 이뤄집니다. 파일이 외부로 전송되지 않습니다.
 
+📖 **[사용 방법 가이드 (이미지 포함)](docs/사용방법.md)** · 오프라인용 단일 파일: [`docs/사용방법.html`](docs/사용방법.html)
+
 ## 주요 기능
 
 | 기능 | 상태 | 설명 |
@@ -59,20 +61,20 @@ npm run build      # 렌더러/메인 번들 빌드
 ### 설치형 .exe 만들기 (Windows)
 
 ```bash
-npm run dist       # release/ 에 NSIS 설치 파일 생성
+npm run dist       # release/ 에 NSIS 설치 파일(.exe) 생성
 npm run dist:dir   # 설치 없이 압축 해제형(폴더) 빌드만 → release/win-unpacked/
 ```
 
-> **참고 (winCodeSign 심링크 문제):** electron-builder가 NSIS/zip 타깃을 만들 때
-> 코드서명 도구(`winCodeSign`)를 푸는데, macOS용 심볼릭 링크가 포함돼 있어
-> **Windows에서 개발자 모드/관리자 권한이 없으면** `Cannot create symbolic link` 오류로 실패합니다.
-> 설치 파일을 만들려면 다음 중 하나가 필요합니다.
-> - **설정 → 개발자용 → 개발자 모드 켜기** 후 `npm run dist`
-> - 또는 **관리자 권한 터미널**에서 `npm run dist`
+`npm run dist` 를 돌리면 `release/Office Viewer Setup <버전>.exe` 설치 파일이 만들어집니다.
+이 파일 하나만 전달하면 받는 사람이 더블클릭으로 설치해 쓸 수 있습니다.
+
+> **코드 서명은 비활성화**되어 있습니다(`win.signAndEditExecutable: false`).
+> 이렇게 한 이유: electron-builder가 서명 도구(`winCodeSign`)를 풀 때 macOS용 심볼릭 링크가 포함돼,
+> **개발자 모드/관리자 권한이 없는 Windows에서는** `Cannot create symbolic link` 오류로 빌드가 실패합니다.
+> 서명을 끄면 그 단계를 건너뛰어 일반 사용자 권한으로도 설치 파일이 만들어집니다.
+> (서명되지 않은 앱이므로 최초 실행 시 SmartScreen "추가 정보 → 실행" 안내가 나올 수 있습니다.)
 >
-> 권한 없이 배포하려면 압축 해제형 빌드(`npm run dist:dir`)로 나온
-> `release/win-unpacked/` 폴더를 zip으로 묶어 그대로 전달하면 됩니다(설치 불필요, 더블클릭 실행).
-> 최신 포터블 빌드는 [Releases](https://github.com/YoonK04/OfficeViewer/releases)에서 받을 수 있습니다.
+> 미리 빌드된 설치 파일/포터블은 [Releases](https://github.com/YoonK04/OfficeViewer/releases)에서 받을 수 있습니다.
 
 ### 스모크 테스트
 

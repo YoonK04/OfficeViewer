@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self' ws: http: https: data: blob:;" />
+    <title>Office Viewer</title>
+  </head>
+  <body>
+    <div id="app">
+      <aside id="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-title">탐색기</span>
+          <button id="btn-open-folder" class="btn" title="폴더 열기">📁 폴더 열기</button>
+        </div>
+        <div id="tree" class="tree">
+          <div class="tree-empty">폴더를 열어 시작하세요.</div>
+        </div>
+      </aside>
+      <div id="splitter-v" class="splitter-v"></div>
+      <main id="workspace"></main>
+    </div>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

@@ -4,6 +4,12 @@ import ExcelJS from 'exceljs'
 // Univer 정렬 enum → ExcelJS 문자열
 const H = { 1: 'left', 2: 'center', 3: 'right' }
 const V = { 1: 'top', 2: 'middle', 3: 'bottom' }
+// Univer BorderStyleTypes → ExcelJS 테두리 스타일
+const BORDER_STYLE_OUT = {
+  1: 'thin', 2: 'hair', 3: 'dotted', 4: 'dashed', 5: 'dashDot', 6: 'dashDotDot',
+  7: 'double', 8: 'medium', 9: 'mediumDashed', 10: 'mediumDashDot',
+  11: 'mediumDashDotDot', 12: 'slantDashDot', 13: 'thick'
+}
 
 // '#rrggbb' | 'rgb(r,g,b)' → 'FFRRGGBB'
 function toARGB(color) {
@@ -55,12 +61,14 @@ function applyStyle(cell, st) {
   if (st.ht && H[st.ht]) align.horizontal = H[st.ht]
   if (st.vt && V[st.vt]) align.vertical = V[st.vt]
   if (st.tb === 3) align.wrapText = true
+  if (st.tr) align.textRotation = st.tr.v ? 'vertical' : st.tr.a || 0
   if (Object.keys(align).length) cell.alignment = align
 
   if (st.n && st.n.pattern) cell.numFmt = st.n.pattern
 
   if (st.bd) {
-    const side = (b) => (b ? { style: 'thin', color: { argb: toARGB(b.cl) || 'FFBFBFBF' } } : undefined)
+    const side = (b) =>
+      b ? { style: BORDER_STYLE_OUT[b.s] || 'thin', color: { argb: toARGB(b.cl) || 'FF000000' } } : undefined
     const border = {}
     if (st.bd.t) border.top = side(st.bd.t)
     if (st.bd.b) border.bottom = side(st.bd.b)
@@ -113,18 +121,27 @@ export async function univerSnapshotToXlsx(snapshot) {
       }
     }
 
-    // 열 너비 (px → Excel 문자단위 근사)
+    // 열 너비 (px → Excel 문자단위 근사) + 숨김
     const columnData = sheet.columnData || {}
     for (const cKey of Object.keys(columnData)) {
-      const w = columnData[cKey].w
-      if (w) ws.getColumn(parseInt(cKey, 10) + 1).width = Math.max(2, w / 7)
+      const cd = columnData[cKey]
+      const col = ws.getColumn(parseInt(cKey, 10) + 1)
+      if (cd.w) col.width = Math.max(2, cd.w / 7)
+      if (cd.hd) col.hidden = true
     }
 
-    // 행 높이 (px → pt)
+    // 행 높이 (px → pt) + 숨김
     const rowData = sheet.rowData || {}
     for (const rKey of Object.keys(rowData)) {
-      const h = rowData[rKey].h
-      if (h) ws.getRow(parseInt(rKey, 10) + 1).height = h * 0.75
+      const rd = rowData[rKey]
+      const row = ws.getRow(parseInt(rKey, 10) + 1)
+      if (rd.h) row.height = rd.h * 0.75
+      if (rd.hd) row.hidden = true
+    }
+
+    // 격자선 표시
+    if (sheet.showGridlines === 0) {
+      ws.views = [{ showGridLines: false }]
     }
   }
 

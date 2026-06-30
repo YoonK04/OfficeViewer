@@ -60,6 +60,20 @@ async function runSmoke(win) {
     await wait(3500)
     await cap('flowchart')
 
+    // 0-b) 감사테스트(숨김 행·열 / 회전 / 격자선 끄기)
+    await run(`window.__ov.openFile(${JSON.stringify(F('감사테스트.xlsx', '.xlsx'))})`)
+    await wait(2000)
+    await run(`(() => {
+      try {
+        const api = window.__ov.getActiveViewer().getUniverAPI();
+        const ws = api.getActiveWorkbook().getActiveSheet();
+        ws.getRange('A1').activate();
+        if (ws.scrollToCell) ws.scrollToCell(0, 0);
+      } catch(e) { return 'scroll-err:'+e; }
+    })()`)
+    await wait(1500)
+    await cap('audit')
+
     // 1) 엑셀
     await run(`window.__ov.openFile(${JSON.stringify(F('매출요약.xlsx', '.xlsx'))})`)
     await wait(3500)

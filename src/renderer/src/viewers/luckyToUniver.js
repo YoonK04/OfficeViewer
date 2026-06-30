@@ -32,6 +32,12 @@ function buildStyle(v) {
   if (v.vt !== undefined && V_ALIGN[v.vt] !== undefined) s.vt = V_ALIGN[v.vt]
   if (v.tb === 2) s.tb = 3 // 자동 줄바꿈
   if (v.ct && v.ct.fa && v.ct.fa !== 'General') s.n = { pattern: v.ct.fa }
+  // 텍스트 회전: tr=3 세로쓰기, 그 외는 rt(각도). Excel 91~180° → 음수각으로 변환
+  if (v.tr === 3) {
+    s.tr = { a: 0, v: 1 }
+  } else if (typeof v.rt === 'number' && v.rt !== 0) {
+    s.tr = { a: v.rt <= 90 ? v.rt : 90 - v.rt, v: 0 }
+  }
   return s
 }
 
@@ -157,8 +163,23 @@ export function luckyToUniver(luckyJson, fallbackName = 'Workbook') {
       for (const k of Object.keys(config.rowlen)) rowData[k] = { h: config.rowlen[k] }
     }
 
+    // 숨김 행/열 (luckyexcel: rowhidden/colhidden 의 키가 숨김 대상)
+    if (config.rowhidden) {
+      for (const k of Object.keys(config.rowhidden)) {
+        rowData[k] = rowData[k] || {}
+        rowData[k].hd = 1
+      }
+    }
+    if (config.colhidden) {
+      for (const k of Object.keys(config.colhidden)) {
+        columnData[k] = columnData[k] || {}
+        columnData[k].hd = 1
+      }
+    }
+
     const defColW = Math.round(ls.defaultColWidth || 72)
     const defRowH = Math.round(ls.defaultRowHeight || 19)
+    const gridlines = Number(ls.showGridLines === undefined ? 1 : ls.showGridLines) ? 1 : 0
 
     sheets[sheetId] = {
       id: sheetId,
@@ -167,6 +188,7 @@ export function luckyToUniver(luckyJson, fallbackName = 'Workbook') {
       columnCount: Math.max(maxCol + 10, 26),
       defaultColumnWidth: defColW,
       defaultRowHeight: defRowH,
+      showGridlines: gridlines,
       cellData,
       mergeData,
       columnData,

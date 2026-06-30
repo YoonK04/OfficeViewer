@@ -60,8 +60,19 @@ npm run build      # 렌더러/메인 번들 빌드
 
 ```bash
 npm run dist       # release/ 에 NSIS 설치 파일 생성
-npm run dist:dir   # 설치 없이 압축 해제형(폴더) 빌드만
+npm run dist:dir   # 설치 없이 압축 해제형(폴더) 빌드만 → release/win-unpacked/
 ```
+
+> **참고 (winCodeSign 심링크 문제):** electron-builder가 NSIS/zip 타깃을 만들 때
+> 코드서명 도구(`winCodeSign`)를 푸는데, macOS용 심볼릭 링크가 포함돼 있어
+> **Windows에서 개발자 모드/관리자 권한이 없으면** `Cannot create symbolic link` 오류로 실패합니다.
+> 설치 파일을 만들려면 다음 중 하나가 필요합니다.
+> - **설정 → 개발자용 → 개발자 모드 켜기** 후 `npm run dist`
+> - 또는 **관리자 권한 터미널**에서 `npm run dist`
+>
+> 권한 없이 배포하려면 압축 해제형 빌드(`npm run dist:dir`)로 나온
+> `release/win-unpacked/` 폴더를 zip으로 묶어 그대로 전달하면 됩니다(설치 불필요, 더블클릭 실행).
+> 최신 포터블 빌드는 [Releases](https://github.com/YoonK04/OfficeViewer/releases)에서 받을 수 있습니다.
 
 ### 스모크 테스트
 

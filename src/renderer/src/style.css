@@ -115,9 +115,33 @@ body {
 }
 .pane-tool:hover { background: var(--bg-3); color: var(--text); }
 
+.pane-splitter {
+  width: 6px;
+  flex: 0 0 6px;
+  cursor: col-resize;
+  background: var(--border);
+}
+.pane-splitter:hover { background: var(--accent); }
+
 .pane-body { flex: 1; position: relative; overflow: hidden; background: #fff; }
 .viewer { position: absolute; inset: 0; }
 .viewer.hidden { display: none; }
+
+.doc-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  background: #525659;
+  padding: 20px 0;
+}
+.doc-scroll .docx-wrapper { background: transparent; padding: 0; }
+.doc-scroll .docx-wrapper > section.docx {
+  margin: 0 auto 16px;
+  box-shadow: 0 2px 12px #0006;
+  background: #fff;
+}
+.ppt-scroll { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.ppt-scroll > * { box-shadow: 0 2px 12px #0006; }
 
 .placeholder {
   position: absolute; inset: 0;
@@ -146,6 +170,25 @@ body {
 .btn:hover { background: var(--accent-hover); }
 .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
 .btn.ghost:hover { background: var(--bg-3); }
+
+.toast {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #323233;
+  color: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px #0008;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s, transform .18s;
+  z-index: 9999;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 .spinner {
   width: 28px; height: 28px;

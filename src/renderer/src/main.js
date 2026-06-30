@@ -1,6 +1,12 @@
 import './style.css'
 import { initExplorer, setRoot } from './explorer.js'
-import { initWorkspace, openFile, splitActivePane } from './workspace.js'
+import {
+  initWorkspace,
+  openFile,
+  splitActivePane,
+  saveActiveTab,
+  getActiveViewer
+} from './workspace.js'
 
 const workspaceEl = document.getElementById('workspace')
 const treeEl = document.getElementById('tree')
@@ -9,8 +15,16 @@ const btnOpenFolder = document.getElementById('btn-open-folder')
 initWorkspace(workspaceEl)
 initExplorer(treeEl, (file) => openFile(file))
 
+// Ctrl+S → 활성 탭 저장
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault()
+    saveActiveTab()
+  }
+})
+
 // 개발용 스모크 테스트 훅
-window.__ov = { setRoot, openFile, splitActivePane }
+window.__ov = { setRoot, openFile, splitActivePane, saveActiveTab, getActiveViewer }
 
 btnOpenFolder.addEventListener('click', async () => {
   const folder = await window.api.openFolder()

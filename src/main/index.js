@@ -39,33 +39,75 @@ function createWindow() {
   }
 }
 
-// 스모크 테스트: 샘플 폴더를 열고 파일을 띄운 뒤 화면을 PNG로 캡처
+// 스모크 테스트: 샘플 폴더를 열고 각 형식을 띄운 뒤 화면을 PNG로 캡처
 async function runSmoke(win) {
   const sampleDir = join(__dirname, '../../sample-data')
-  const file1 = { path: join(sampleDir, '매출요약.xlsx'), name: '매출요약.xlsx', ext: '.xlsx' }
-  const file2 = { path: join(sampleDir, '재고현황.xlsx'), name: '재고현황.xlsx', ext: '.xlsx' }
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+  const run = (js) => win.webContents.executeJavaScript(js)
+  const cap = async (name) => {
+    const img = await win.webContents.capturePage()
+    await fs.writeFile(join(sampleDir, `_smoke_${name}.png`), img.toPNG())
+    console.log('SMOKE_CAPTURED ' + name)
+  }
+  const F = (n, ext) => ({ path: join(sampleDir, n), name: n, ext })
   try {
-    await new Promise((r) => setTimeout(r, 1500))
-    await win.webContents.executeJavaScript(
-      `window.__ov.setRoot(${JSON.stringify(sampleDir)})`
-    )
-    await win.webContents.executeJavaScript(
-      `window.__ov.openFile(${JSON.stringify(file1)})`
-    )
-    await new Promise((r) => setTimeout(r, 3500))
-    const img1 = await win.webContents.capturePage()
-    await fs.writeFile(join(sampleDir, '_smoke_1.png'), img1.toPNG())
-    console.log('SMOKE_CAPTURED 1')
+    await wait(1500)
+    await run(`window.__ov.setRoot(${JSON.stringify(sampleDir)})`)
 
-    // 분할 + 두 번째 파일
-    await win.webContents.executeJavaScript(`window.__ov.splitActivePane()`)
-    await win.webContents.executeJavaScript(
-      `window.__ov.openFile(${JSON.stringify(file2)})`
-    )
-    await new Promise((r) => setTimeout(r, 3000))
-    const img2 = await win.webContents.capturePage()
-    await fs.writeFile(join(sampleDir, '_smoke_2.png'), img2.toPNG())
-    console.log('SMOKE_CAPTURED 2')
+    // 1) 엑셀
+    await run(`window.__ov.openFile(${JSON.stringify(F('매출요약.xlsx', '.xlsx'))})`)
+    await wait(3500)
+    await cap('excel')
+
+    // 2) 저장 라운드트립: 셀 편집 → 저장 → 재오픈
+    try {
+      const diag = await run(`(() => {
+        const v = window.__ov.getActiveViewer();
+        return { type: typeof v, keys: v ? Object.keys(v) : null };
+      })()`)
+      console.log('SMOKE_VIEWER ' + JSON.stringify(diag))
+      await run(`(() => {
+        const v = window.__ov.getActiveViewer();
+        const api = v.getUniverAPI();
+        api.getActiveWorkbook().getActiveSheet().getRange('A10').setValue('저장 라운드트립 OK');
+      })()`)
+      await wait(800)
+      await run(`window.__ov.saveActiveTab()`)
+      await wait(2500)
+      console.log('SMOKE_SAVED')
+    } catch (e) {
+      console.log('SMOKE_SAVE_ERROR ' + (e && e.message ? e.message : e))
+    }
+
+    // 3) 워드
+    try {
+      await run(`window.__ov.openFile(${JSON.stringify(F('보고서.docx', '.docx'))})`)
+      await wait(2500)
+      await cap('word')
+    } catch (e) {
+      console.log('SMOKE_WORD_ERROR ' + e)
+    }
+
+    // 4) PPT
+    try {
+      await run(`window.__ov.openFile(${JSON.stringify(F('발표자료.pptx', '.pptx'))})`)
+      await wait(3000)
+      await cap('ppt')
+    } catch (e) {
+      console.log('SMOKE_PPT_ERROR ' + e)
+    }
+
+    // 5) 분할 + 저장된 엑셀 재오픈(라운드트립 결과 확인)
+    try {
+      await run(`window.__ov.splitActivePane()`)
+      await run(`window.__ov.openFile(${JSON.stringify(F('매출요약.xlsx', '.xlsx'))})`)
+      await wait(3500)
+      await cap('split')
+    } catch (e) {
+      console.log('SMOKE_SPLIT_ERROR ' + e)
+    }
+
+    console.log('SMOKE_DONE')
   } catch (err) {
     console.log('SMOKE_ERROR ' + (err && err.stack ? err.stack : err))
   }

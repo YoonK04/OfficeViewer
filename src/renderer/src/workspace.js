@@ -1,8 +1,12 @@
 // 워크스페이스: 분할 가능한 패널 + 패널별 탭 + 지연 로딩 뷰어
 import { createExcelViewer } from './viewers/excel.js'
+import { createWordViewer } from './viewers/word.js'
+import { createPptViewer } from './viewers/ppt.js'
 import { createFallbackViewer } from './viewers/fallback.js'
 
 const EXCEL_EXTS = ['.xlsx', '.xlsm']
+const WORD_EXTS = ['.docx']
+const PPT_EXTS = ['.pptx']
 
 let workspaceEl = null
 const panes = []
@@ -45,11 +49,57 @@ function addPane() {
 
   paneEl.addEventListener('mousedown', () => setActivePane(pane.id))
 
+  paneEl.style.flex = '1 1 0'
   panes.push(pane)
   setActivePane(pane.id)
   renderTabbar(pane)
   renderBody(pane)
+  layoutSplitters()
   return pane
+}
+
+// 패널 사이에 드래그 가능한 경계를 (재)배치
+function layoutSplitters() {
+  workspaceEl.querySelectorAll('.pane-splitter').forEach((s) => s.remove())
+  for (let i = 0; i < panes.length - 1; i++) {
+    const left = panes[i]
+    const right = panes[i + 1]
+    const sp = document.createElement('div')
+    sp.className = 'pane-splitter'
+    left.el.after(sp)
+    attachPaneDrag(sp, left, right)
+  }
+}
+
+function attachPaneDrag(sp, left, right) {
+  sp.addEventListener('mousedown', (e) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const wL = left.el.getBoundingClientRect().width
+    const wR = right.el.getBoundingClientRect().width
+    const gL = parseFloat(left.el.style.flexGrow || '1')
+    const gR = parseFloat(right.el.style.flexGrow || '1')
+    const totalG = gL + gR
+    const totalW = wL + wR
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX
+      let newL = Math.min(totalW - 120, Math.max(120, wL + dx))
+      const ratio = newL / totalW
+      left.el.style.flexGrow = String(totalG * ratio)
+      right.el.style.flexGrow = String(totalG * (1 - ratio))
+    }
+    const onUp = () => {
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  })
 }
 
 function getPane(id) {
@@ -69,13 +119,55 @@ export function splitActivePane() {
   return newPane
 }
 
+// 활성 패널의 활성 탭 뷰어 (개발/디버그용)
+export function getActiveViewer() {
+  const pane = getActivePane()
+  const tab = pane.tabs.find((t) => t.id === pane.activeTabId)
+  return tab ? tab.viewer : null
+}
+
+// 활성 패널의 활성 탭 저장 (엑셀만 지원)
+export async function saveActiveTab() {
+  const pane = getActivePane()
+  const tab = pane.tabs.find((t) => t.id === pane.activeTabId)
+  if (!tab || !tab.viewer || typeof tab.viewer.save !== 'function') return
+  try {
+    toast('저장 중…', true)
+    const buf = await tab.viewer.save()
+    await window.api.writeFile(tab.filePath, buf)
+    tab.dirty = false
+    renderTabbar(pane)
+    toast('저장됨: ' + tab.fileName)
+  } catch (err) {
+    console.error('[workspace] 저장 실패:', err)
+    toast('저장 실패: ' + (err.message || err))
+  }
+}
+
+let toastTimer = null
+function toast(msg, persist) {
+  let el = document.getElementById('ov-toast')
+  if (!el) {
+    el = document.createElement('div')
+    el.id = 'ov-toast'
+    el.className = 'toast'
+    document.body.appendChild(el)
+  }
+  el.textContent = msg
+  el.classList.add('show')
+  if (toastTimer) clearTimeout(toastTimer)
+  if (!persist) toastTimer = setTimeout(() => el.classList.remove('show'), 1800)
+}
+
 function closePane(pane) {
   if (panes.length <= 1) return // 마지막 패널은 유지
   pane.tabs.forEach((t) => disposeTab(t))
   pane.el.remove()
   const idx = panes.indexOf(pane)
   panes.splice(idx, 1)
+  panes.forEach((p) => (p.el.style.flexGrow = '1'))
   setActivePane(panes[Math.max(0, idx - 1)].id)
+  layoutSplitters()
 }
 
 // 파일을 활성 패널에 연다 (이미 열려 있으면 해당 탭으로 이동)
@@ -131,7 +223,22 @@ async function loadViewer(pane, tab) {
     if (EXCEL_EXTS.includes(tab.ext)) {
       const arrayBuffer = await window.api.readFile(tab.filePath)
       loading.remove()
-      tab.viewer = createExcelViewer(content, { arrayBuffer, fileName: tab.fileName })
+      tab.viewer = createExcelViewer(content, {
+        arrayBuffer,
+        fileName: tab.fileName,
+        onDirtyChange: (isDirty) => {
+          tab.dirty = isDirty
+          renderTabbar(pane)
+        }
+      })
+    } else if (WORD_EXTS.includes(tab.ext)) {
+      const arrayBuffer = await window.api.readFile(tab.filePath)
+      loading.remove()
+      tab.viewer = await createWordViewer(content, { arrayBuffer, fileName: tab.fileName })
+    } else if (PPT_EXTS.includes(tab.ext)) {
+      const arrayBuffer = await window.api.readFile(tab.filePath)
+      loading.remove()
+      tab.viewer = await createPptViewer(content, { arrayBuffer, fileName: tab.fileName })
     } else {
       loading.remove()
       tab.viewer = createFallbackViewer(content, {
@@ -188,7 +295,7 @@ function renderTabbar(pane) {
 
     const label = document.createElement('span')
     label.className = 'tab-label'
-    label.textContent = tab.fileName
+    label.textContent = (tab.dirty ? '● ' : '') + tab.fileName
 
     const close = document.createElement('span')
     close.className = 'tab-close'

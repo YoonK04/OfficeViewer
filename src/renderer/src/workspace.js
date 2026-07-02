@@ -2,11 +2,13 @@
 import { createExcelViewer } from './viewers/excel.js'
 import { createWordViewer } from './viewers/word.js'
 import { createPptViewer } from './viewers/ppt.js'
+import { createHwpViewer } from './viewers/hwp.js'
 import { createFallbackViewer } from './viewers/fallback.js'
 
 const EXCEL_EXTS = ['.xlsx', '.xlsm']
 const WORD_EXTS = ['.docx']
 const PPT_EXTS = ['.pptx']
+const HWP_EXTS = ['.hwp', '.hwpx']
 
 let workspaceEl = null
 const panes = []
@@ -152,6 +154,10 @@ export async function saveActiveTab() {
   }
 }
 
+export function notify(msg) {
+  toast(msg)
+}
+
 let toastTimer = null
 function toast(msg, persist) {
   let el = document.getElementById('ov-toast')
@@ -198,6 +204,19 @@ export async function openFile({ path, name, ext }) {
   pane.tabs.push(tab)
   renderTabbar(pane)
   await activateTab(pane, tab.id)
+}
+
+// 탐색기에서 드롭한 파일들을 (x,y) 위치의 패널에 연다
+export async function openDroppedFiles(list, x, y) {
+  const el = document.elementFromPoint(x, y)
+  const paneEl = el && el.closest('.pane')
+  if (paneEl) {
+    const pane = panes.find((p) => p.id === paneEl.dataset.paneId)
+    if (pane) setActivePane(pane.id)
+  }
+  for (const info of list) {
+    await openFile(info)
+  }
 }
 
 async function activateTab(pane, tabId) {
@@ -247,6 +266,15 @@ async function loadViewer(pane, tab) {
       const arrayBuffer = await window.api.readFile(tab.filePath)
       loading.remove()
       tab.viewer = await createPptViewer(content, { arrayBuffer, fileName: tab.fileName })
+    } else if (HWP_EXTS.includes(tab.ext)) {
+      const arrayBuffer = await window.api.readFile(tab.filePath)
+      loading.remove()
+      tab.viewer = await createHwpViewer(content, {
+        arrayBuffer,
+        filePath: tab.filePath,
+        fileName: tab.fileName,
+        ext: tab.ext
+      })
     } else {
       loading.remove()
       tab.viewer = createFallbackViewer(content, {

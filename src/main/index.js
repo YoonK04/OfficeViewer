@@ -6,7 +6,7 @@ import { dirname } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const SUPPORTED = ['.xlsx', '.xlsm', '.xls', '.csv', '.docx', '.doc', '.pptx', '.ppt']
+const SUPPORTED = ['.xlsx', '.xlsm', '.xls', '.csv', '.docx', '.doc', '.pptx', '.ppt', '.hwp', '.hwpx']
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -26,6 +26,10 @@ function createWindow() {
   win.webContents.on('console-message', (_e, level, message) => {
     console.log(`[renderer:${level}] ${message}`)
   })
+
+  // 파일을 창에 드롭했을 때 그 파일로 페이지가 이동하는 기본 동작 차단
+  win.webContents.on('will-navigate', (e) => e.preventDefault())
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
@@ -73,6 +77,30 @@ async function runSmoke(win) {
     })()`)
     await wait(1500)
     await cap('audit')
+
+    // 0-c) 드래그&드롭 오버레이(합성 dragenter)
+    await run(`(() => {
+      const dt = new DataTransfer();
+      dt.items.add(new File(['x'], 'test.xlsx'));
+      window.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer: dt }));
+      return document.getElementById('drop-overlay').classList.contains('show');
+    })()`).then((v) => console.log('SMOKE_DROP_OVERLAY ' + v))
+    await wait(700)
+    await cap('dnd-overlay')
+    await run(`window.dispatchEvent(new DragEvent('dragleave', { bubbles: true }))`)
+
+    // 0-d) 드롭 파이프라인: 실제 경로로 openDroppedFiles → 우측 좌표에 열기
+    await run(`window.__ov.splitActivePane()`)
+    await run(`(() => {
+      const pane = document.querySelectorAll('.pane')[1];
+      const r = pane.getBoundingClientRect();
+      return window.__ov.openDroppedFiles(
+        [${JSON.stringify(F('감사테스트.xlsx', '.xlsx'))}],
+        r.left + r.width/2, r.top + r.height/2
+      );
+    })()`)
+    await wait(3000)
+    await cap('dnd-open')
 
     // 1) 엑셀
     await run(`window.__ov.openFile(${JSON.stringify(F('매출요약.xlsx', '.xlsx'))})`)

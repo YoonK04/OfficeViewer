@@ -173,6 +173,29 @@ body {
 .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
 .btn.ghost:hover { background: var(--bg-3); }
 
+#drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(14, 99, 156, 0.18);
+  backdrop-filter: blur(1px);
+  pointer-events: none;
+}
+#drop-overlay.show { display: flex; }
+#drop-overlay .drop-box {
+  border: 3px dashed var(--accent-hover);
+  border-radius: 14px;
+  padding: 40px 64px;
+  font-size: 20px;
+  color: #fff;
+  background: rgba(30, 30, 30, 0.85);
+  box-shadow: 0 10px 40px #000a;
+}
+.hwp-scroll { background: #525659; }
+
 .tab-ghost {
   position: fixed;
   z-index: 10000;

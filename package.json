@@ -23,6 +23,7 @@
     "@univerjs/presets": "^0.25.1",
     "docx-preview": "^0.3.7",
     "exceljs": "^4.4.0",
+    "hwp.js": "^0.0.3",
     "luckyexcel": "^1.0.1",
     "pptx-preview": "^1.0.7"
   },

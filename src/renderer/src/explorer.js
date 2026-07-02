@@ -7,7 +7,9 @@ const FILE_ICONS = {
   '.docx': '📄',
   '.doc': '📄',
   '.pptx': '📊',
-  '.ppt': '📊'
+  '.ppt': '📊',
+  '.hwp': '📕',
+  '.hwpx': '📕'
 }
 
 let onOpenFile = null

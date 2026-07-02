@@ -248,7 +248,11 @@ async function loadViewer(pane, tab) {
 
   try {
     if (EXCEL_EXTS.includes(tab.ext)) {
+      const tRead = performance.now()
       const arrayBuffer = await window.api.readFile(tab.filePath)
+      console.log(
+        `[perf] read ${tab.fileName} ${(arrayBuffer.byteLength / 1024).toFixed(0)}KB in ${(performance.now() - tRead).toFixed(0)}ms`
+      )
       loading.remove()
       tab.viewer = createExcelViewer(content, {
         arrayBuffer,
@@ -315,6 +319,11 @@ function closeTab(pane, tabId) {
         if (t.contentEl) t.contentEl.classList.toggle('hidden', t.id !== next.id)
       })
     }
+  }
+  // 분할된 패널의 탭을 모두 닫으면 그 패널 자동 제거 (패널이 1개뿐이면 빈 상태로 유지)
+  if (pane.tabs.length === 0 && panes.length > 1) {
+    closePane(pane)
+    return
   }
   renderTabbar(pane)
   renderBody(pane)

@@ -4,6 +4,7 @@ import { UniverSheetsCorePreset } from '@univerjs/preset-sheets-core'
 import sheetsCoreKoKR from '@univerjs/preset-sheets-core/locales/ko-KR'
 import '@univerjs/preset-sheets-core/lib/index.css'
 import LuckyExcel from 'luckyexcel'
+import ParseWorker from './parseWorker.js?worker'
 import { luckyToUniver } from './luckyToUniver.js'
 import { univerSnapshotToXlsx } from './univerToXlsx.js'
 
@@ -15,6 +16,45 @@ function emptyWorkbook(name) {
     styles: {},
     sheets: { s1: { id: 's1', name: 'Sheet1', rowCount: 100, columnCount: 26, cellData: {} } }
   }
+}
+
+// 워커에서 파싱 (UI 스레드 비차단). 실패 시 메인스레드로 폴백.
+function parseInWorker(arrayBuffer, fileName) {
+  return new Promise((resolve, reject) => {
+    let worker
+    try {
+      worker = new ParseWorker()
+    } catch (e) {
+      return reject(e)
+    }
+    const done = (fn) => (arg) => {
+      clearTimeout(timer)
+      try {
+        worker.terminate()
+      } catch (e) {
+        /* noop */
+      }
+      fn(arg)
+    }
+    const ok = done(resolve)
+    const fail = done(reject)
+    const timer = setTimeout(() => fail(new Error('parse worker timeout')), 120000)
+    worker.onmessage = (e) => (e.data.ok ? ok(e.data.exportJson) : fail(new Error(e.data.error)))
+    worker.onerror = (e) => fail(new Error(e.message || 'worker error'))
+    worker.postMessage({ arrayBuffer, fileName })
+  })
+}
+
+// 메인스레드 파싱 (폴백)
+function parseMainThread(arrayBuffer, fileName) {
+  return new Promise((resolve, reject) => {
+    try {
+      const file = new File([arrayBuffer], fileName)
+      LuckyExcel.transformExcelToLucky(file, (exportJson) => resolve(exportJson))
+    } catch (err) {
+      reject(err)
+    }
+  })
 }
 
 // container: 마운트할 DOM 요소
@@ -48,35 +88,56 @@ export function createExcelViewer(container, { arrayBuffer, fileName, onDirtyCha
     /* 이벤트 미지원 시 무시 */
   }
 
-  const file = new File([arrayBuffer], fileName, {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  })
+  // 파싱 중 로딩 오버레이 (워커가 UI를 막지 않으므로 스피너가 계속 돈다)
+  const overlay = document.createElement('div')
+  overlay.className = 'placeholder excel-loading'
+  overlay.innerHTML = '<div class="spinner"></div><div>여는 중… (큰 파일은 시간이 걸릴 수 있어요)</div>'
+  container.appendChild(overlay)
 
-  try {
-    LuckyExcel.transformExcelToLucky(file, (exportJson) => {
+  let disposed = false
+
+  ;(async () => {
+    const tParse = performance.now()
+    let exportJson
+    try {
+      exportJson = await parseInWorker(arrayBuffer, fileName)
+    } catch (werr) {
+      console.warn('[excel] 워커 파싱 실패, 메인스레드로 폴백:', werr)
       try {
-        if (!exportJson || !exportJson.sheets || exportJson.sheets.length === 0) {
-          univerAPI.createWorkbook(emptyWorkbook(fileName))
-        } else {
-          const wb = luckyToUniver(exportJson, fileName)
-          univerAPI.createWorkbook(wb)
-        }
-      } catch (err) {
-        console.error('[excel] 변환 실패:', err)
-        univerAPI.createWorkbook(emptyWorkbook(fileName))
+        exportJson = await parseMainThread(arrayBuffer, fileName)
+      } catch (merr) {
+        console.error('[excel] 파싱 실패:', merr)
       }
-      // 초기 로드 mutation이 dirty로 잡히지 않도록 다음 틱부터 감지
-      setTimeout(() => {
-        ready = true
-      }, 300)
-    })
-  } catch (err) {
-    console.error('[excel] luckyexcel 파싱 실패:', err)
-    univerAPI.createWorkbook(emptyWorkbook(fileName))
-  }
+    }
+    if (disposed) return
+    const tParsed = performance.now()
+    try {
+      if (!exportJson || !exportJson.sheets || exportJson.sheets.length === 0) {
+        univerAPI.createWorkbook(emptyWorkbook(fileName))
+      } else {
+        const wb = luckyToUniver(exportJson, fileName)
+        const tConverted = performance.now()
+        univerAPI.createWorkbook(wb)
+        const cells = exportJson.sheets.reduce((s, sh) => s + (sh.celldata ? sh.celldata.length : 0), 0)
+        console.log(
+          `[perf] ${fileName} cells=${cells} parse=${(tParsed - tParse).toFixed(0)}ms ` +
+          `convert=${(tConverted - tParsed).toFixed(0)}ms render=${(performance.now() - tConverted).toFixed(0)}ms`
+        )
+      }
+    } catch (err) {
+      console.error('[excel] 변환 실패:', err)
+      univerAPI.createWorkbook(emptyWorkbook(fileName))
+    }
+    overlay.remove()
+    // 초기 로드 mutation이 dirty로 잡히지 않도록 다음 틱부터 감지
+    setTimeout(() => {
+      ready = true
+    }, 300)
+  })()
 
   return {
     dispose() {
+      disposed = true
       try {
         univer.dispose()
       } catch (e) {

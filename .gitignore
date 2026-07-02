@@ -4,3 +4,5 @@ dist/
 release/
 *.log
 sample-data/_smoke_*.png
+sample-data/대용량.xlsx
+sample-data/대용량.xlsm

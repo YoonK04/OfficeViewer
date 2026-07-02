@@ -151,6 +151,7 @@ body {
   gap: 14px; color: var(--text-dim); background: var(--bg);
 }
 .placeholder .big { font-size: 40px; }
+.excel-loading { z-index: 50; }
 .placeholder .btn { margin-top: 6px; }
 
 .empty-pane {

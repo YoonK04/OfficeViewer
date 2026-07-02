@@ -59,6 +59,23 @@ async function runSmoke(win) {
     await run(`window.__ov.setRoot(${JSON.stringify(sampleDir)})`)
     await win.webContents.capturePage() // 워밍업(첫 캡처 빈이미지 방지)
 
+    // 0-e) #2: 분할 패널의 탭을 모두 닫으면 패널 자동 제거
+    await run(`window.__ov.splitActivePane()`)
+    await run(`window.__ov.openFile(${JSON.stringify(F('감사테스트.xlsx', '.xlsx'))})`)
+    await wait(2500)
+    await run(`(() => {
+      const before = document.querySelectorAll('.pane').length;
+      const active = document.querySelector('.pane.active');
+      active.querySelector('.tab.active .tab-close').click();
+      return before + '->' + document.querySelectorAll('.pane').length;
+    })()`).then((n) => console.log('SMOKE_EMPTYPANE ' + n))
+    await wait(500)
+
+    // 0-perf) 대용량 xlsm 로드 시간 측정
+    await run(`window.__ov.openFile(${JSON.stringify(F('대용량.xlsm', '.xlsm'))})`)
+    await wait(8000)
+    await cap('heavy')
+
     // 0) 공정도(테두리/병합/열너비 충실도 확인)
     await run(`window.__ov.openFile(${JSON.stringify(F('공정도.xlsx', '.xlsx'))})`)
     await wait(3500)

@@ -106,10 +106,19 @@ function attachPaneDrag(sp, left, right) {
       document.body.style.userSelect = ''
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      scheduleRelayout() // 패널 폭 변경 후 캔버스 재계산
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
   })
+}
+
+// Univer(캔버스)는 window resize에 반응해 다시 그린다.
+// 컨테이너를 옮기거나 다시 보이거나 크기가 바뀐 뒤 호출하면 잔상(배경 미갱신)을 없앤다.
+function scheduleRelayout() {
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
+  )
 }
 
 function getPane(id) {
@@ -182,6 +191,7 @@ function closePane(pane) {
   panes.forEach((p) => (p.el.style.flexGrow = '1'))
   setActivePane(panes[Math.max(0, idx - 1)].id)
   layoutSplitters()
+  scheduleRelayout() // 남은 패널들 폭 변경 후 캔버스 재계산
 }
 
 // 파일을 활성 패널에 연다 (이미 열려 있으면 해당 탭으로 이동)
@@ -231,6 +241,8 @@ async function activateTab(pane, tabId) {
   if (tab && !tab.loaded) {
     await loadViewer(pane, tab)
   }
+  // 다시 보이게 된 캔버스가 배경까지 다시 그리도록 재배치 트리거 (잔상 방지)
+  scheduleRelayout()
 }
 
 async function loadViewer(pane, tab) {
@@ -451,6 +463,7 @@ function moveTab(tab, from, to) {
   activateTab(to, tab.id) // 대상 패널에서 표시(+ 미로딩 시 로드)
 
   if (from.tabs.length === 0 && panes.length > 1) closePane(from)
+  scheduleRelayout() // 옮긴 캔버스 위치/배경 재계산 (잔상 방지)
 }
 
 function renderTabbar(pane) {

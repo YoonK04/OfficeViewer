@@ -1,6 +1,6 @@
 {
   "name": "office-viewer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "로컬 Office 문서 통합 뷰어 (탐색기 + 탭/분할)",
   "main": "out/main/index.js",
   "author": "Ultivis",

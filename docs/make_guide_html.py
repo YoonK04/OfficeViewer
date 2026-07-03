@@ -97,6 +97,7 @@ html = f"""<!doctype html>
 <tr><td>.xlsx, .xlsm</td><td>보기 + 편집 + 저장</td></tr>
 <tr><td>.docx</td><td>미리보기(보기 전용)</td></tr>
 <tr><td>.pptx</td><td>미리보기(보기 전용)</td></tr>
+<tr><td>.pdf</td><td>미리보기(페이지 스크롤)</td></tr>
 <tr><td>.hwp</td><td>실험적 미리보기(단순 문서), 안 되면 원래 프로그램으로 열기</td></tr>
 <tr><td>.doc, .ppt, .xls, .csv, .hwpx</td><td>"원래 프로그램으로 열기"</td></tr>
 </table>

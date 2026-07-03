@@ -3,12 +3,14 @@ import { createExcelViewer } from './viewers/excel.js'
 import { createWordViewer } from './viewers/word.js'
 import { createPptViewer } from './viewers/ppt.js'
 import { createHwpViewer } from './viewers/hwp.js'
+import { createPdfViewer } from './viewers/pdf.js'
 import { createFallbackViewer } from './viewers/fallback.js'
 
 const EXCEL_EXTS = ['.xlsx', '.xlsm']
 const WORD_EXTS = ['.docx']
 const PPT_EXTS = ['.pptx']
 const HWP_EXTS = ['.hwp', '.hwpx']
+const PDF_EXTS = ['.pdf']
 
 let workspaceEl = null
 const panes = []
@@ -282,6 +284,10 @@ async function loadViewer(pane, tab) {
       const arrayBuffer = await window.api.readFile(tab.filePath)
       loading.remove()
       tab.viewer = await createPptViewer(content, { arrayBuffer, fileName: tab.fileName })
+    } else if (PDF_EXTS.includes(tab.ext)) {
+      const arrayBuffer = await window.api.readFile(tab.filePath)
+      loading.remove()
+      tab.viewer = createPdfViewer(content, { arrayBuffer, fileName: tab.fileName })
     } else if (HWP_EXTS.includes(tab.ext)) {
       const arrayBuffer = await window.api.readFile(tab.filePath)
       loading.remove()

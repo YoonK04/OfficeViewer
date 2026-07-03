@@ -6,7 +6,7 @@ import { dirname } from 'path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const SUPPORTED = ['.xlsx', '.xlsm', '.xls', '.csv', '.docx', '.doc', '.pptx', '.ppt', '.hwp', '.hwpx']
+const SUPPORTED = ['.xlsx', '.xlsm', '.xls', '.csv', '.docx', '.doc', '.pptx', '.ppt', '.hwp', '.hwpx', '.pdf']
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -75,6 +75,15 @@ async function runSmoke(win) {
     await run(`window.__ov.openFile(${JSON.stringify(F('대용량.xlsm', '.xlsm'))})`)
     await wait(8000)
     await cap('heavy')
+
+    // 0-pdf) PDF 뷰어(pdf.js 캔버스)
+    await run(`window.__ov.openFile(${JSON.stringify(F('샘플문서.pdf', '.pdf'))})`)
+    await wait(3000)
+    await run(`(() => {
+      const canvases = document.querySelectorAll('.pdf-page canvas');
+      return JSON.stringify({ pages: document.querySelectorAll('.pdf-page').length, rendered: canvases.length });
+    })()`).then((r) => console.log('SMOKE_PDF_STATE ' + r))
+    await cap('pdf')
 
     // 0) 공정도(테두리/병합/열너비 충실도 확인)
     await run(`window.__ov.openFile(${JSON.stringify(F('공정도.xlsx', '.xlsx'))})`)

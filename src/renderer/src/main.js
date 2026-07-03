@@ -20,7 +20,7 @@ initExplorer(treeEl, (file) => openFile(file))
 // ── 파일 탐색기에서 드래그&드롭으로 열기 ──────────
 const SUPPORTED_EXTS = [
   '.xlsx', '.xlsm', '.xls', '.csv',
-  '.docx', '.doc', '.pptx', '.ppt', '.hwp', '.hwpx'
+  '.docx', '.doc', '.pptx', '.ppt', '.hwp', '.hwpx', '.pdf'
 ]
 
 const dropOverlay = document.createElement('div')

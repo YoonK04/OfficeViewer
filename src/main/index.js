@@ -1,4 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
+import electronUpdater from 'electron-updater'
+const { autoUpdater } = electronUpdater
 import { join } from 'path'
 import { promises as fs } from 'fs'
 import { fileURLToPath } from 'url'
@@ -41,6 +43,36 @@ function createWindow() {
   if (process.env['OV_SMOKE']) {
     win.webContents.on('did-finish-load', () => runSmoke(win))
   }
+
+  setupAutoUpdate(win)
+}
+
+// 자동 업데이트: 패키징된 앱에서만 동작. 새 버전을 백그라운드로 받고 재시작 시 적용.
+function setupAutoUpdate(win) {
+  if (!app.isPackaged) return
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('[updater] update available: ' + info.version)
+  })
+  autoUpdater.on('update-downloaded', async (info) => {
+    const res = await dialog.showMessageBox(win, {
+      type: 'info',
+      buttons: ['지금 재시작', '나중에'],
+      defaultId: 0,
+      cancelId: 1,
+      title: '업데이트 준비 완료',
+      message: `새 버전(${info.version})이 준비되었습니다.`,
+      detail: '지금 재시작하면 업데이트가 적용됩니다. (나중에 선택 시 다음 종료 때 적용)'
+    })
+    if (res.response === 0) autoUpdater.quitAndInstall()
+  })
+  autoUpdater.on('error', (err) => {
+    console.log('[updater] error: ' + (err == null ? 'unknown' : (err.stack || err).toString()))
+  })
+
+  autoUpdater.checkForUpdates().catch((e) => console.log('[updater] check failed: ' + e))
 }
 
 // 스모크 테스트: 샘플 폴더를 열고 각 형식을 띄운 뒤 화면을 PNG로 캡처

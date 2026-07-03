@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "로컬 Office 문서 통합 뷰어 (탐색기 + 탭/분할)",
   "main": "out/main/index.js",
-  "author": "YoonK04",
+  "author": "Ultivis",
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",
@@ -22,6 +22,7 @@
     "@univerjs/preset-sheets-core": "^0.25.1",
     "@univerjs/presets": "^0.25.1",
     "docx-preview": "^0.3.7",
+    "electron-updater": "^6.8.9",
     "exceljs": "^4.4.0",
     "hwp.js": "^0.0.3",
     "luckyexcel": "^1.0.1",
@@ -29,7 +30,7 @@
     "pptx-preview": "^1.0.7"
   },
   "build": {
-    "appId": "com.yoonk04.officeviewer",
+    "appId": "com.ultivis.officeviewer",
     "productName": "Office Viewer",
     "directories": {
       "output": "release"
@@ -38,6 +39,11 @@
       "out/**/*",
       "package.json"
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "ultivis-iot",
+      "repo": "OfficeViewer"
+    },
     "win": {
       "target": [
         "nsis"

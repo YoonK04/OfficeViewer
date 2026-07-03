@@ -78,7 +78,16 @@ npm run dist:dir   # 설치 없이 압축 해제형(폴더) 빌드만 → releas
 > 서명을 끄면 그 단계를 건너뛰어 일반 사용자 권한으로도 설치 파일이 만들어집니다.
 > (서명되지 않은 앱이므로 최초 실행 시 SmartScreen "추가 정보 → 실행" 안내가 나올 수 있습니다.)
 >
-> 미리 빌드된 설치 파일/포터블은 [Releases](https://github.com/YoonK04/OfficeViewer/releases)에서 받을 수 있습니다.
+> 미리 빌드된 설치 파일/포터블은 [Releases](https://github.com/ultivis-iot/OfficeViewer/releases)에서 받을 수 있습니다.
+
+### 자동 업데이트
+
+설치본(NSIS)은 **자동 업데이트**를 지원합니다(electron-updater + GitHub Releases). 앱을 켜면 백그라운드로
+새 버전을 확인·다운로드하고, 준비되면 "지금 재시작 / 나중에"를 물어봅니다. 즉 **한 번만 설치**하면
+이후 버전은 자동으로 반영됩니다(포터블 zip은 자동 업데이트 대상이 아님).
+
+배포자는 버전을 올려 `npm run dist -- --publish always`(환경변수 `GH_TOKEN` 필요)로 릴리스에 올리거나,
+`npm run dist` 로 생성된 `release/latest.yml` + 설치 exe + `*.blockmap` 을 릴리스에 함께 업로드하면 됩니다.
 
 ### 스모크 테스트
 
